@@ -8,6 +8,7 @@ import javax.lang.model.SourceVersion;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.TypeElement;
 import javax.persistence.Entity;
+import javax.tools.Diagnostic;
 import javax.tools.FileObject;
 import javax.tools.StandardLocation;
 import java.io.IOException;
@@ -20,33 +21,38 @@ import java.util.stream.Collectors;
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
 public class DDLProcessor extends AbstractProcessor {
 
-
   private final JpaProcessor entityProcessor;
 
   public DDLProcessor() {
-    super();
-    entityProcessor = new EntityProcessor(new FieldProcessor());
+    entityProcessor = new DDLEntityProcessor(
+      new DDLColumnProcessor(),
+      new DDLConstraintProcessor(processingEnv)
+    );
   }
 
   @Override
   public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
-    String sql = roundEnv.getElementsAnnotatedWith(Entity.class).stream()
-      .filter(element -> element.getKind() == ElementKind.CLASS)
-      .map(entityProcessor)
-      .collect(Collectors.joining(";\n"));
-
-    writeSqlToFile(sql);
+    try {
+      String sql = roundEnv.getElementsAnnotatedWith(Entity.class).stream()
+        .filter(element -> element.getKind() == ElementKind.CLASS)
+        .map(entityProcessor)
+        .collect(Collectors.joining(";\n"));
+      writeSqlToFile(sql);
+    } catch (ProcessingException e) {
+      processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, e.getMessage(), e.element());
+      return false;
+    }
     return true;
   }
 
   private void writeSqlToFile(String sql) {
     try {
-      FileObject fo = processingEnv.getFiler().createResource(StandardLocation.SOURCE_OUTPUT, "", "sql");
+      FileObject fo = processingEnv.getFiler().createResource(StandardLocation.SOURCE_OUTPUT, "", "ddl.sql");
       Writer writer = fo.openWriter();
       writer.append(sql);
       writer.close();
     } catch (IOException e) {
-      // TODO handle IO
+      processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR, "IO error while generating ddl");
     }
   }
 }

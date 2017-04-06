@@ -19,7 +19,7 @@
         <configuration>
           <annotationProcessors>
             <annotationProcessor>
-              sk.tuke.mp.persistence.processors.AnnotationProcessor
+              sk.tuke.mp.persistence.processors.DDLProcessor
             </annotationProcessor>
           </annotationProcessors>
         </configuration>

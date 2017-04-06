@@ -6,12 +6,12 @@ import javax.persistence.Entity;
 import java.util.List;
 import java.util.stream.Collectors;
 
-public class EntityProcessor implements JpaProcessor {
+class DDLEntityProcessor implements JpaProcessor {
 
   private final JpaProcessor columnProcessor;
   private final JpaProcessor constraintProcessor;
 
-  EntityProcessor(JpaProcessor columnProcessor, JpaProcessor constraintProcessor) {
+  DDLEntityProcessor(JpaProcessor columnProcessor, JpaProcessor constraintProcessor) {
     this.columnProcessor = columnProcessor;
     this.constraintProcessor = constraintProcessor;
   }
