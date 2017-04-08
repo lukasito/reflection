@@ -1,8 +1,8 @@
 package sk.tuke.mp.persistence.processors.mysql;
 
-import sk.tuke.mp.persistence.processors.JpaProcessor;
+import sk.tuke.mp.persistence.processors.CompileTimeJpaProcessor;
 
-public interface MysqlJpaProcessor extends JpaProcessor {
+public interface MysqlCompileTimeJpaProcessor extends CompileTimeJpaProcessor {
 
   String ESCAPING_CHAR = "`";
 

@@ -1,6 +1,6 @@
 package sk.tuke.mp.persistence.processors.mysql;
 
-import sk.tuke.mp.persistence.processors.ProcessingException;
+import sk.tuke.mp.persistence.processors.CompileTimeProcessingException;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.Element;
@@ -12,7 +12,7 @@ import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.tools.Diagnostic;
 
-class DDLForeignKeyProcessor implements MysqlJpaProcessor {
+class DDLForeignKeyProcessor implements MysqlCompileTimeJpaProcessor {
 
   private final ProcessingEnvironment processingEnvironment;
 
@@ -43,23 +43,23 @@ class DDLForeignKeyProcessor implements MysqlJpaProcessor {
   private void validate(Element element) {
     ManyToOne manyToOne = element.getAnnotation(ManyToOne.class);
     if (isTargetEntityUndefined(manyToOne)) {
-      throw new ProcessingException("@ManyToOne required targetEntity to be set!", element);
+      throw new CompileTimeProcessingException("@ManyToOne required targetEntity to be set!", element);
     }
 
     String foreignEntityName = getTargetEntityName(manyToOne);
 
     if (foreignEntityName != null && foreignEntityName.isEmpty()) {
-      throw new ProcessingException("@ManyToOne.targetEntity is not @Entity with name()", element);
+      throw new CompileTimeProcessingException("@ManyToOne.targetEntity is not @Entity with name()", element);
     }
 
     JoinColumn joinColumn = element.getAnnotation(JoinColumn.class);
     if (joinColumn == null) {
-      throw new ProcessingException("@JoinColumn annotation missing on @ManyToOne entity", element);
+      throw new CompileTimeProcessingException("@JoinColumn annotation missing on @ManyToOne entity", element);
     }
 
     String name = joinColumn.name();
     if (name.isEmpty()) {
-      throw new ProcessingException("@JoinColumn.name needs to be specified!", element);
+      throw new CompileTimeProcessingException("@JoinColumn.name needs to be specified!", element);
     }
   }
 

@@ -1,7 +1,7 @@
 package sk.tuke.mp.persistence.processors.mysql;
 
-import sk.tuke.mp.persistence.processors.JpaProcessor;
-import sk.tuke.mp.persistence.processors.ProcessingException;
+import sk.tuke.mp.persistence.processors.CompileTimeJpaProcessor;
+import sk.tuke.mp.persistence.processors.CompileTimeProcessingException;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.ProcessingEnvironment;
@@ -23,16 +23,16 @@ import java.util.stream.Stream;
 import static java.util.stream.Collectors.joining;
 import static javax.tools.Diagnostic.Kind.ERROR;
 import static javax.tools.Diagnostic.Kind.WARNING;
-import static sk.tuke.mp.persistence.processors.JpaProcessor.notEmptyResult;
+import static sk.tuke.mp.persistence.processors.CompileTimeJpaProcessor.notEmptyResult;
 
 
 @SupportedAnnotationTypes("javax.persistence.Entity")
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
 public class DDLProcessor extends AbstractProcessor {
 
-  private JpaProcessor entityProcessor;
-  private JpaProcessor primaryKeyProcessor;
-  private JpaProcessor foreignKeyProcessor;
+  private CompileTimeJpaProcessor entityProcessor;
+  private CompileTimeJpaProcessor primaryKeyProcessor;
+  private CompileTimeJpaProcessor foreignKeyProcessor;
 
   @Override
   public synchronized void init(ProcessingEnvironment processingEnv) {
@@ -46,36 +46,46 @@ public class DDLProcessor extends AbstractProcessor {
   public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
     try {
       Set<? extends Element> entities = roundEnv.getElementsAnnotatedWith(Entity.class);
-      String tables = entities.stream()
-        .filter(element -> element.getKind() == ElementKind.CLASS)
-        .map(entityProcessor)
-        .collect(joining(";\n\n"));
-
-      String primaryKeys = entities.stream()
-        .filter(element -> element.getKind() == ElementKind.CLASS)
-        .flatMap(elem -> elem.getEnclosedElements().stream())
-        .filter(elem -> elem.getKind() == ElementKind.FIELD)
-        .map(primaryKeyProcessor)
-        .filter(notEmptyResult)
-        .collect(joining(";\n"));
-
-      String foreignKeys = entities.stream()
-        .filter(element -> element.getKind() == ElementKind.CLASS)
-        .flatMap(elem -> elem.getEnclosedElements().stream())
-        .filter(elem -> elem.getKind() == ElementKind.FIELD)
-        .map(foreignKeyProcessor)
-        .filter(notEmptyResult)
-        .collect(joining(";\n"));
+      String tables = processTables(entities);
+      String primaryKeys = processPrimaryKeys(entities);
+      String foreignKeys = processForeignKeys(entities);
 
       String sql = Stream.of(tables, primaryKeys, foreignKeys).collect(joining(";\n\n"));
       writeSqlToFile(sql + ";");
-    } catch (ProcessingException e) {
+    } catch (CompileTimeProcessingException e) {
       printProcessingError(e);
       return false;
     } catch (IOException e) {
       printWarning(e);
     }
     return true;
+  }
+
+  private String processForeignKeys(Set<? extends Element> entities) {
+    return entities.stream()
+      .filter(element -> element.getKind() == ElementKind.CLASS)
+      .flatMap(elem -> elem.getEnclosedElements().stream())
+      .filter(elem -> elem.getKind() == ElementKind.FIELD)
+      .map(foreignKeyProcessor)
+      .filter(notEmptyResult)
+      .collect(joining(";\n"));
+  }
+
+  private String processPrimaryKeys(Set<? extends Element> entities) {
+    return entities.stream()
+      .filter(element -> element.getKind() == ElementKind.CLASS)
+      .flatMap(elem -> elem.getEnclosedElements().stream())
+      .filter(elem -> elem.getKind() == ElementKind.FIELD)
+      .map(primaryKeyProcessor)
+      .filter(notEmptyResult)
+      .collect(joining(";\n"));
+  }
+
+  private String processTables(Set<? extends Element> entities) {
+    return entities.stream()
+      .filter(element -> element.getKind() == ElementKind.CLASS)
+      .map(entityProcessor)
+      .collect(joining(";\n\n"));
   }
 
   private void writeSqlToFile(String sql) throws IOException {
@@ -85,7 +95,7 @@ public class DDLProcessor extends AbstractProcessor {
     }
   }
 
-  private void printProcessingError(ProcessingException e) {
+  private void printProcessingError(CompileTimeProcessingException e) {
     processingEnv.getMessager().printMessage(ERROR, e.getMessage(), e.element());
   }
 

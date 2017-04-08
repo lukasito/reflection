@@ -15,7 +15,7 @@ public class Person {
   @Column(name = "age")
   private int age;
 
-  @ManyToOne(targetEntity = Department.class, fetch = FetchType.LAZY)
+  @ManyToOne(targetEntity = DepartmentImpl.class, fetch = FetchType.LAZY)
   @JoinColumn(name = "DEPT_ID")
   private Department department;
 

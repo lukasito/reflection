@@ -4,7 +4,7 @@ import javax.lang.model.element.Element;
 import javax.persistence.Entity;
 import javax.persistence.Id;
 
-public class DDLPrimaryKeyProcessor implements MysqlJpaProcessor {
+public class DDLPrimaryKeyProcessor implements MysqlCompileTimeJpaProcessor {
 
   @Override
   public String apply(Element element) {

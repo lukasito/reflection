@@ -4,7 +4,7 @@ import javax.lang.model.element.Element;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
-public interface JpaProcessor extends Function<Element, String> {
+public interface CompileTimeJpaProcessor extends Function<Element, String> {
 
   String EMPTY_RESULT = "";
   Predicate<String> notEmptyResult = string -> !string.isEmpty();
@@ -12,8 +12,10 @@ public interface JpaProcessor extends Function<Element, String> {
   /**
    * @param element entity or columns
    * @return generated sql
-   * @throws ProcessingException
+   * @throws CompileTimeProcessingException
    */
   @Override
   String apply(Element element);
+
+  String normalize(String string);
 }

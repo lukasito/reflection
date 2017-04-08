@@ -1,6 +1,6 @@
 package sk.tuke.mp.persistence.processors.mysql;
 
-import sk.tuke.mp.persistence.processors.ProcessingException;
+import sk.tuke.mp.persistence.processors.CompileTimeProcessingException;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.type.TypeKind;
@@ -9,14 +9,10 @@ import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 
-class DDLColumnProcessor implements MysqlJpaProcessor {
+class DDLColumnProcessor implements MysqlCompileTimeJpaProcessor {
 
   @Override
   public String apply(Element element) {
-    return processColumn(element);
-  }
-
-  private String processColumn(Element element) {
     return processIdAnnotation(element);
   }
 
@@ -34,7 +30,7 @@ class DDLColumnProcessor implements MysqlJpaProcessor {
     if (isDefined(column)) {
       String colName = column.name();
       if (colName.isEmpty()) {
-        throw new ProcessingException("@Column.name missing!", element);
+        throw new CompileTimeProcessingException("@Column.name missing!", element);
       }
       return createColumnDefinition(colName, element.asType().getKind());
     } else {
@@ -48,12 +44,12 @@ class DDLColumnProcessor implements MysqlJpaProcessor {
     if (isDefined(manyToOne)) {
       JoinColumn joinColumn = element.getAnnotation(JoinColumn.class);
       if (joinColumn == null) {
-        throw new ProcessingException("@JoinColumn annotation missing on @ManyToOne entity", element);
+        throw new CompileTimeProcessingException("@JoinColumn annotation missing on @ManyToOne entity", element);
       }
 
       String name = joinColumn.name();
       if (name.isEmpty()) {
-        throw new ProcessingException("@JoinColumn.name needs to be specified!", element);
+        throw new CompileTimeProcessingException("@JoinColumn.name needs to be specified!", element);
       }
       return createColumnDefinition(name, TypeKind.INT);
     } else {
@@ -86,8 +82,9 @@ class DDLColumnProcessor implements MysqlJpaProcessor {
         return "DOUBLE";
       case INT:
         return "INT";
+      default:
+        throw new CompileTimeProcessingException("Unsupported data type!", null);
     }
-    return null;
   }
 
   private boolean isDefined(Object obj) {

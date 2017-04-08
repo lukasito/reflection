@@ -1,8 +1,8 @@
 package sk.tuke.mp.persistence.processors.mysql;
 
 import org.apache.commons.lang3.StringUtils;
-import sk.tuke.mp.persistence.processors.JpaProcessor;
-import sk.tuke.mp.persistence.processors.ProcessingException;
+import sk.tuke.mp.persistence.processors.CompileTimeJpaProcessor;
+import sk.tuke.mp.persistence.processors.CompileTimeProcessingException;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
@@ -10,23 +10,23 @@ import javax.persistence.Entity;
 import java.util.List;
 import java.util.stream.Collectors;
 
-class DDLEntityProcessor implements MysqlJpaProcessor {
+class DDLEntityProcessor implements MysqlCompileTimeJpaProcessor {
 
   private final int INDENTATION = 2;
 
-  private final JpaProcessor columnProcessor;
+  private final CompileTimeJpaProcessor columnProcessor;
 
-  DDLEntityProcessor(JpaProcessor columnProcessor) {
+  DDLEntityProcessor(CompileTimeJpaProcessor columnProcessor) {
     this.columnProcessor = columnProcessor;
   }
 
   @Override
-  public String apply(Element element) throws ProcessingException {
+  public String apply(Element element) throws CompileTimeProcessingException {
     String sql = "CREATE TABLE IF NOT EXISTS %s (\n%s\n)";
     String tableName = normalize(element.getAnnotation(Entity.class).name());
 
     if (tableName.isEmpty()) {
-      throw new ProcessingException("Missing @Entity.name", element);
+      throw new CompileTimeProcessingException("Missing @Entity.name", element);
     }
     List<? extends Element> enclosedElements = element.getEnclosedElements();
 
