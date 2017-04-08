@@ -1,4 +1,6 @@
-package sk.tuke.mp.persistence.processors;
+package sk.tuke.mp.persistence.processors.mysql;
+
+import sk.tuke.mp.persistence.processors.ProcessingException;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.Element;
@@ -10,9 +12,8 @@ import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.tools.Diagnostic;
-import java.util.Optional;
 
-class DDLConstraintProcessor implements JpaProcessor {
+class DDLConstraintProcessor implements MysqlJpaProcessor {
 
   private final ProcessingEnvironment processingEnvironment;
 
@@ -26,40 +27,39 @@ class DDLConstraintProcessor implements JpaProcessor {
   }
 
   private String processConstraints(Element element) {
-    return processPrimaryKey(element)
-      .orElse("");
+    return processPrimaryKey(element);
   }
 
-  private Optional<String> processPrimaryKey(Element element) {
+  private String processPrimaryKey(Element element) {
     Id id = element.getAnnotation(Id.class);
     if (id == null) {
       return processForeignKey(element);
     } else {
-      return Optional.of("PRIMARY KEY (id)");
+      return String.format("PRIMARY KEY (%s)", normalize("ID"));
     }
   }
 
-  private Optional<String> processForeignKey(Element element) {
+  private String processForeignKey(Element element) {
     ManyToOne manyToOne = element.getAnnotation(ManyToOne.class);
     if (manyToOne == null) {
-      return Optional.empty();
+      return EMPTY_RESULT;
     } else {
       validate(element);
       String name = element.getAnnotation(JoinColumn.class).name();
       String foreignEntityName = getTargetEntityName(manyToOne);
-      return Optional.of("FOREIGN KEY (" + name + ")" + " REFERENCES " + foreignEntityName + "(id)");
+      return String.format("FOREIGN KEY (%s) REFERENCES %s(ID)", normalize(name), normalize(foreignEntityName));
     }
   }
 
   private void validate(Element element) {
     ManyToOne manyToOne = element.getAnnotation(ManyToOne.class);
-    if (isTargetEntityDefined(manyToOne)) {
+    if (isTargetEntityUndefined(manyToOne)) {
       throw new ProcessingException("@ManyToOne required targetEntity to be set!", element);
     }
 
     String foreignEntityName = getTargetEntityName(manyToOne);
 
-    if (foreignEntityName.isEmpty()) {
+    if (foreignEntityName != null && foreignEntityName.isEmpty()) {
       throw new ProcessingException("@ManyToOne.targetEntity is not @Entity with name()", element);
     }
 
@@ -74,7 +74,7 @@ class DDLConstraintProcessor implements JpaProcessor {
     }
   }
 
-  private boolean isTargetEntityDefined(ManyToOne manyToOne) {
+  private boolean isTargetEntityUndefined(ManyToOne manyToOne) {
     try {
       manyToOne.targetEntity();
     } catch (MirroredTypeException e) {

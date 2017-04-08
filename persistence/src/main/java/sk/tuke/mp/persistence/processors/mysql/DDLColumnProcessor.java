@@ -1,4 +1,6 @@
-package sk.tuke.mp.persistence.processors;
+package sk.tuke.mp.persistence.processors.mysql;
+
+import sk.tuke.mp.persistence.processors.ProcessingException;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.type.TypeKind;
@@ -7,9 +9,8 @@ import javax.persistence.Column;
 import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
-import java.util.Optional;
 
-class DDLColumnProcessor implements JpaProcessor {
+class DDLColumnProcessor implements MysqlJpaProcessor {
 
   @Override
   public String apply(Element element) {
@@ -17,33 +18,32 @@ class DDLColumnProcessor implements JpaProcessor {
   }
 
   private String processColumn(Element element) {
-    return processIdAnnotation(element)
-      .orElse("");
+    return processIdAnnotation(element);
   }
 
-  private Optional<String> processIdAnnotation(Element element) {
+  private String processIdAnnotation(Element element) {
     Id id = element.getAnnotation(Id.class);
     if (isDefined(id)) {
-      return Optional.of("id " + processTypeKind(element.asType()) + " NOT NULL");
+      return createColumnDefinition("ID", element.asType(), false);
     } else {
       return processColumnAnnotation(element);
     }
   }
 
-  private Optional<String> processColumnAnnotation(Element element) {
+  private String processColumnAnnotation(Element element) {
     Column column = element.getAnnotation(Column.class);
     if (isDefined(column)) {
       String colName = column.name();
       if (colName.isEmpty()) {
         throw new ProcessingException("@Column.name missing!", element);
       }
-      return Optional.of(colName + " " + processTypeKind(element.asType()));
+      return createColumnDefinition(colName, element.asType());
     } else {
       return processManyToOne(element);
     }
   }
 
-  private Optional<String> processManyToOne(Element element) {
+  private String processManyToOne(Element element) {
     // Uni-directional support only
     ManyToOne manyToOne = element.getAnnotation(ManyToOne.class);
     if (isDefined(manyToOne)) {
@@ -56,10 +56,19 @@ class DDLColumnProcessor implements JpaProcessor {
       if (name.isEmpty()) {
         throw new ProcessingException("@JoinColumn.name needs to be specified!", element);
       }
-      return Optional.of(name + " " + processTypeKind(element.asType()));
+      return createColumnDefinition(name, element.asType());
     } else {
-      return Optional.empty();
+      return EMPTY_RESULT;
     }
+  }
+
+  private String createColumnDefinition(String column, TypeMirror type, boolean nullable) {
+    String columnDefinition = createColumnDefinition(column, type);
+    return nullable ? columnDefinition : columnDefinition + " NOT NULL";
+  }
+
+  private String createColumnDefinition(String name, TypeMirror element) {
+    return String.format("%s %s", normalize(name), processTypeKind(element));
   }
 
   private String processTypeKind(TypeMirror typeMirror) {

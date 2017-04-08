@@ -1,4 +1,8 @@
-package sk.tuke.mp.persistence.processors;
+package sk.tuke.mp.persistence.processors.mysql;
+
+import org.apache.commons.lang3.StringUtils;
+import sk.tuke.mp.persistence.processors.JpaProcessor;
+import sk.tuke.mp.persistence.processors.ProcessingException;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
@@ -6,7 +10,9 @@ import javax.persistence.Entity;
 import java.util.List;
 import java.util.stream.Collectors;
 
-class DDLEntityProcessor implements JpaProcessor {
+class DDLEntityProcessor implements MysqlJpaProcessor {
+
+  private final int INDENTATION = 2;
 
   private final JpaProcessor columnProcessor;
   private final JpaProcessor constraintProcessor;
@@ -19,7 +25,7 @@ class DDLEntityProcessor implements JpaProcessor {
   @Override
   public String apply(Element element) throws ProcessingException {
     String sql = "CREATE TABLE IF NOT EXISTS %s (\n%s\n)";
-    String tableName = element.getAnnotation(Entity.class).name();
+    String tableName = normalize(element.getAnnotation(Entity.class).name());
 
     if (tableName.isEmpty()) {
       throw new ProcessingException("Missing @Entity.name", element);
@@ -29,12 +35,21 @@ class DDLEntityProcessor implements JpaProcessor {
     String columns = enclosedElements.stream()
       .filter(elem -> elem.getKind() == ElementKind.FIELD)
       .map(columnProcessor)
+      .filter(notEmptyResult)
+      .map(this::indent)
       .collect(Collectors.joining(",\n"));
 
     String constraints = enclosedElements.stream()
       .filter(elem -> elem.getKind() == ElementKind.FIELD)
       .map(constraintProcessor)
+      .filter(notEmptyResult)
+      .map(this::indent)
       .collect(Collectors.joining(",\n"));
+
     return String.format(sql, tableName, columns + ",\n" + constraints);
+  }
+
+  private String indent(String str) {
+    return StringUtils.repeat(" ", INDENTATION) + str;
   }
 }

@@ -19,7 +19,7 @@
         <configuration>
           <annotationProcessors>
             <annotationProcessor>
-              sk.tuke.mp.persistence.processors.DDLProcessor
+              sk.tuke.mp.persistence.processors.mysql.DDLProcessor
             </annotationProcessor>
           </annotationProcessors>
         </configuration>
