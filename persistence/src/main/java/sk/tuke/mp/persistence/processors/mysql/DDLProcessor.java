@@ -9,6 +9,7 @@ import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.SourceVersion;
+import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.TypeElement;
 import javax.persistence.Entity;
@@ -17,10 +18,12 @@ import javax.tools.StandardLocation;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
+import static java.util.stream.Collectors.joining;
 import static javax.tools.Diagnostic.Kind.ERROR;
 import static javax.tools.Diagnostic.Kind.WARNING;
+import static sk.tuke.mp.persistence.processors.JpaProcessor.notEmptyResult;
 
 
 @SupportedAnnotationTypes("javax.persistence.Entity")
@@ -28,24 +31,44 @@ import static javax.tools.Diagnostic.Kind.WARNING;
 public class DDLProcessor extends AbstractProcessor {
 
   private JpaProcessor entityProcessor;
+  private JpaProcessor primaryKeyProcessor;
+  private JpaProcessor foreignKeyProcessor;
 
   @Override
   public synchronized void init(ProcessingEnvironment processingEnv) {
     super.init(processingEnv);
-    entityProcessor = new DDLEntityProcessor(
-      new DDLColumnProcessor(),
-      new DDLConstraintProcessor(processingEnv)
-    );
+    entityProcessor = new DDLEntityProcessor(new DDLColumnProcessor());
+    primaryKeyProcessor = new DDLPrimaryKeyProcessor();
+    foreignKeyProcessor = new DDLForeignKeyProcessor(processingEnv);
   }
 
   @Override
   public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
     try {
-      String sql = roundEnv.getElementsAnnotatedWith(Entity.class).stream()
+      Set<? extends Element> entities = roundEnv.getElementsAnnotatedWith(Entity.class);
+      String tables = entities.stream()
         .filter(element -> element.getKind() == ElementKind.CLASS)
         .map(entityProcessor)
-        .collect(Collectors.joining(";\n\n"));
-      writeSqlToFile(sql);
+        .collect(joining(";\n\n"));
+
+      String primaryKeys = entities.stream()
+        .filter(element -> element.getKind() == ElementKind.CLASS)
+        .flatMap(elem -> elem.getEnclosedElements().stream())
+        .filter(elem -> elem.getKind() == ElementKind.FIELD)
+        .map(primaryKeyProcessor)
+        .filter(notEmptyResult)
+        .collect(joining(";\n"));
+
+      String foreignKeys = entities.stream()
+        .filter(element -> element.getKind() == ElementKind.CLASS)
+        .flatMap(elem -> elem.getEnclosedElements().stream())
+        .filter(elem -> elem.getKind() == ElementKind.FIELD)
+        .map(foreignKeyProcessor)
+        .filter(notEmptyResult)
+        .collect(joining(";\n"));
+
+      String sql = Stream.of(tables, primaryKeys, foreignKeys).collect(joining(";\n\n"));
+      writeSqlToFile(sql + ";");
     } catch (ProcessingException e) {
       printProcessingError(e);
       return false;

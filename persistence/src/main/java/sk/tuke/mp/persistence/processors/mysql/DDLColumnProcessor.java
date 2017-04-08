@@ -4,7 +4,6 @@ import sk.tuke.mp.persistence.processors.ProcessingException;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.type.TypeKind;
-import javax.lang.model.type.TypeMirror;
 import javax.persistence.Column;
 import javax.persistence.Id;
 import javax.persistence.JoinColumn;
@@ -24,7 +23,7 @@ class DDLColumnProcessor implements MysqlJpaProcessor {
   private String processIdAnnotation(Element element) {
     Id id = element.getAnnotation(Id.class);
     if (isDefined(id)) {
-      return createColumnDefinition("ID", element.asType(), false);
+      return createColumnDefinition("ID", element.asType().getKind(), false);
     } else {
       return processColumnAnnotation(element);
     }
@@ -37,7 +36,7 @@ class DDLColumnProcessor implements MysqlJpaProcessor {
       if (colName.isEmpty()) {
         throw new ProcessingException("@Column.name missing!", element);
       }
-      return createColumnDefinition(colName, element.asType());
+      return createColumnDefinition(colName, element.asType().getKind());
     } else {
       return processManyToOne(element);
     }
@@ -56,23 +55,22 @@ class DDLColumnProcessor implements MysqlJpaProcessor {
       if (name.isEmpty()) {
         throw new ProcessingException("@JoinColumn.name needs to be specified!", element);
       }
-      return createColumnDefinition(name, element.asType());
+      return createColumnDefinition(name, TypeKind.INT);
     } else {
       return EMPTY_RESULT;
     }
   }
 
-  private String createColumnDefinition(String column, TypeMirror type, boolean nullable) {
-    String columnDefinition = createColumnDefinition(column, type);
+  private String createColumnDefinition(String column, TypeKind typeKind, boolean nullable) {
+    String columnDefinition = createColumnDefinition(column, typeKind);
     return nullable ? columnDefinition : columnDefinition + " NOT NULL";
   }
 
-  private String createColumnDefinition(String name, TypeMirror element) {
-    return String.format("%s %s", normalize(name), processTypeKind(element));
+  private String createColumnDefinition(String name, TypeKind typeKind) {
+    return String.format("%s %s", normalize(name), processTypeKind(typeKind));
   }
 
-  private String processTypeKind(TypeMirror typeMirror) {
-    TypeKind typeKind = typeMirror.getKind();
+  private String processTypeKind(TypeKind typeKind) {
     String sqlType;
     if (typeKind.isPrimitive()) {
       sqlType = processPrimitive(typeKind);

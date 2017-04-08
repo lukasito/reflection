@@ -8,38 +8,20 @@ import javax.lang.model.type.MirroredTypeException;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.persistence.Entity;
-import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.tools.Diagnostic;
 
-class DDLConstraintProcessor implements MysqlJpaProcessor {
+class DDLForeignKeyProcessor implements MysqlJpaProcessor {
 
   private final ProcessingEnvironment processingEnvironment;
 
-  DDLConstraintProcessor(ProcessingEnvironment processingEnvironment) {
+  DDLForeignKeyProcessor(ProcessingEnvironment processingEnvironment) {
     this.processingEnvironment = processingEnvironment;
   }
 
   @Override
   public String apply(Element element) {
-    return processConstraints(element);
-  }
-
-  private String processConstraints(Element element) {
-    return processPrimaryKey(element);
-  }
-
-  private String processPrimaryKey(Element element) {
-    Id id = element.getAnnotation(Id.class);
-    if (id == null) {
-      return processForeignKey(element);
-    } else {
-      return String.format("PRIMARY KEY (%s)", normalize("ID"));
-    }
-  }
-
-  private String processForeignKey(Element element) {
     ManyToOne manyToOne = element.getAnnotation(ManyToOne.class);
     if (manyToOne == null) {
       return EMPTY_RESULT;
@@ -47,7 +29,14 @@ class DDLConstraintProcessor implements MysqlJpaProcessor {
       validate(element);
       String name = element.getAnnotation(JoinColumn.class).name();
       String foreignEntityName = getTargetEntityName(manyToOne);
-      return String.format("FOREIGN KEY (%s) REFERENCES %s(ID)", normalize(name), normalize(foreignEntityName));
+      String tableName = element.getEnclosingElement().getAnnotation(Entity.class).name();
+      return String.format("ALTER TABLE %s ADD CONSTRAINT fk_%s FOREIGN KEY (%s) REFERENCES %s(%s)",
+        normalize(tableName),
+        name,
+        normalize(name),
+        normalize(foreignEntityName),
+        normalize("ID")
+      );
     }
   }
 

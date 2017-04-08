@@ -17,10 +17,11 @@
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <persistance-api.version>1.0.2</persistance-api.version>
-    <mysql-connector.version>5.1.6</mysql-connector.version>
+    <mysql-connector.version>5.1.41</mysql-connector.version>
     <apache-derby.version>10.13.1.1</apache-derby.version>
     <junit.version>4.12</junit.version>
     <apache-commons-lang.version>3.5</apache-commons-lang.version>
+    <apache-commons-io.version>2.5</apache-commons-io.version>
   </properties>
 
   <dependencyManagement>
@@ -55,6 +56,12 @@
         <artifactId>commons-lang3</artifactId>
         <version>${apache-commons-lang.version}</version>
       </dependency>
+      <dependency>
+        <groupId>commons-io</groupId>
+        <artifactId>commons-io</artifactId>
+        <version>${apache-commons-io.version}</version>
+      </dependency>
+
     </dependencies>
   </dependencyManagement>
 

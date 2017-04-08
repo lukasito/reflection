@@ -15,11 +15,9 @@ class DDLEntityProcessor implements MysqlJpaProcessor {
   private final int INDENTATION = 2;
 
   private final JpaProcessor columnProcessor;
-  private final JpaProcessor constraintProcessor;
 
-  DDLEntityProcessor(JpaProcessor columnProcessor, JpaProcessor constraintProcessor) {
+  DDLEntityProcessor(JpaProcessor columnProcessor) {
     this.columnProcessor = columnProcessor;
-    this.constraintProcessor = constraintProcessor;
   }
 
   @Override
@@ -39,14 +37,7 @@ class DDLEntityProcessor implements MysqlJpaProcessor {
       .map(this::indent)
       .collect(Collectors.joining(",\n"));
 
-    String constraints = enclosedElements.stream()
-      .filter(elem -> elem.getKind() == ElementKind.FIELD)
-      .map(constraintProcessor)
-      .filter(notEmptyResult)
-      .map(this::indent)
-      .collect(Collectors.joining(",\n"));
-
-    return String.format(sql, tableName, columns + ",\n" + constraints);
+    return String.format(sql, tableName, columns);
   }
 
   private String indent(String str) {
