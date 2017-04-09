@@ -119,13 +119,13 @@ public class ReflectivePersistenceManager implements PersistenceManager {
       } else {
         return standardGet(type, id);
       }
-    } catch (InstantiationException | InvocationTargetException | SQLException | NoSuchMethodException | IllegalAccessException e) {
+    } catch (Exception e) {
       e.printStackTrace();
     }
     return null;
   }
 
-  private <T> T standardGet(Class<T> type, int id) throws IllegalAccessException, InstantiationException, SQLException, NoSuchMethodException, InvocationTargetException, PersistenceException {
+  private <T> T standardGet(Class<T> type, int id) throws Exception {
     Statement statement = conn.createStatement();
     T object = type.newInstance();
     Field[] fields = object.getClass().getDeclaredFields();
@@ -157,7 +157,6 @@ public class ReflectivePersistenceManager implements PersistenceManager {
             all = statement.executeQuery("SELECT * FROM " + type.getSimpleName() + " WHERE ID=" + id);
             all.next();
             break;
-
         }
       }
       if (info > 1) System.out.println("loaded " + type.getSimpleName());
