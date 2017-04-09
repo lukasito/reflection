@@ -1,5 +1,7 @@
 package sk.tuke.mp.persistence.proxy;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import sk.tuke.mp.persistence.utils.EntityDescriptor;
 import sk.tuke.mp.persistence.utils.FieldDescriptor;
 
@@ -8,91 +10,79 @@ import java.lang.reflect.Method;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 public class LazyFetchInvocationHandler implements InvocationHandler {
 
   private Object instance;
-  private final Map<String, Object> initialized = new HashMap<>();
-  private final Map<String, FieldDescriptor> getterToFieldDescriptor;
   private final Connection connection;
-  private final EntityDescriptor entityDescriptor;
+  private final int enclosingEntityId;
+  private final EntityDescriptor lazyEntity;
 
-  public LazyFetchInvocationHandler(EntityDescriptor entityDescriptor, Connection connection) throws Exception {
-    this.entityDescriptor = entityDescriptor;
+  private static final Logger log = LoggerFactory.getLogger(LazyFetchInvocationHandler.class);
+
+  public LazyFetchInvocationHandler(
+    int enclosingEntityId, EntityDescriptor lazyEntity, Connection connection
+  ) throws Exception {
+    this.enclosingEntityId = enclosingEntityId;
+    this.lazyEntity = lazyEntity;
     this.connection = connection;
-    List<FieldDescriptor> lazies = entityDescriptor.getColumns()
-      .stream()
-      .filter(FieldDescriptor::isLazy)
-      .collect(Collectors.toList());
-
-    getterToFieldDescriptor = lazies.stream().collect(Collectors.toMap(
-      FieldDescriptor::getJavaGetter, fd -> fd
-    ));
-    instance = entityDescriptor.getUnderlying().newInstance();
   }
 
   @Override
   public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-    String methodName = method.getName();
-    if (initialized.containsKey(methodName)) {
-      return initialized.get(methodName);
-    } else {
-      if (isLazyInvocation(methodName)) {
-        Object obj = fetchLazy(instance, getterToFieldDescriptor.get(methodName));
-        initialized.put(methodName, obj);
-        return obj;
-      }
+    if (instance == null) {
+      log.debug("Lazy instance hit, fetching..");
+      instance = fetchLazy(lazyEntity);
     }
-    return method.invoke(instance, method, args);
+    log.debug("Invoking method: {}", method);
+    return method.invoke(instance, args);
   }
 
-  private boolean isLazyInvocation(String methodName) {
-    return getterToFieldDescriptor.containsKey(methodName);
-  }
-
-  private Object fetchLazy(Object proxy, FieldDescriptor lazyEntity) throws Exception {
-    String alias1 = "a1" ;
-    String alias2 = "a2" ;
-    EntityDescriptor refEntity = lazyEntity.getRefEntity();
-    List<String> sqlColumns = refEntity.getColumnNames();
+  private Object fetchLazy(EntityDescriptor lazyEntity) throws Exception {
+    String alias1 = "a1";
+    String alias2 = "a2";
+    List<String> sqlColumns = lazyEntity.getColumnNames();
     String sql = String.format("SELECT %s FROM %s %s JOIN %s %s WHERE %s.%s = ?;",
       sqlColumns.stream().map(col -> alias1 + "." + col).collect(Collectors.joining(", ")),
-      refEntity.getEntityName(), alias1,
-      lazyEntity.getEnclosingEntityName(), alias2,
+      lazyEntity.getEntityName(), alias1,
+      lazyEntity.asDescribedField().getEnclosingEntityName(), alias2,
       alias2, "ID"
     );
+
+    log.debug("SQL: {}", sql);
     PreparedStatement preparedStatement = connection.prepareStatement(sql);
-    preparedStatement.setInt(1, resolveEntityId(proxy));
+    preparedStatement.setInt(1, enclosingEntityId);
     ResultSet resultSet = preparedStatement.executeQuery();
-    resultSet.next();
+    resultSet.next(); // should be unique
+    return instanceFromResultSet(lazyEntity, alias1, resultSet);
+  }
 
-    Class<?> refClass = refEntity.getUnderlying();
-    Object refInstance = refClass.newInstance();
+  private Object instanceFromResultSet(
+    EntityDescriptor lazyEntity, String alias1, ResultSet resultSet
+  ) throws Exception {
+    Class<?> refClass = lazyEntity.getUnderlying();
+    Object instance = refClass.newInstance();
 
-    for (FieldDescriptor fd : refEntity.getColumns()) {
+    for (FieldDescriptor fd : lazyEntity.getColumns()) {
       String colName = alias1 + "." + fd.getColumnName();
-      Object value = null;
+      Object value;
       switch (fd.getJavaType()) {
         case "int":
           value = resultSet.getInt(colName);
+          refClass.getMethod(fd.getJavaSetter(), int.class).invoke(instance, value);
+          break;
         case "double":
           value = resultSet.getDouble(colName);
+          refClass.getMethod(fd.getJavaSetter(), double.class).invoke(instance, value);
+          break;
         case "java.lang.String":
           value = resultSet.getString(colName);
-      }
-      if (value != null) {
-        Method method = refClass.getMethod(fd.getJavaSetter());
-        method.invoke(refInstance, value);
+          refClass.getMethod(fd.getJavaSetter(), String.class).invoke(instance, value);
+          break;
       }
     }
-    return refInstance;
-  }
-
-  private int resolveEntityId(Object proxy) throws Exception {
-    return (int) entityDescriptor.getUnderlying().getMethod("getId").invoke(proxy);
+    return instance;
   }
 }

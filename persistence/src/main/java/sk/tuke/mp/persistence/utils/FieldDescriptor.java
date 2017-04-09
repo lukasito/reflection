@@ -18,7 +18,7 @@ public class FieldDescriptor {
   private final String joinColumn;
   private final String javaType;
   private final boolean isLazy;
-  private final EntityDescriptor foreign;
+  private final EntityDescriptor refEntity;
   private final String fieldName;
   private final String javaGetter;
   private final String javaSetter;
@@ -32,15 +32,15 @@ public class FieldDescriptor {
     javaType = describeJavaType(column);
     isLazy = describeLaziness(column);
     joinColumn = findJoinColumnName(column);
-    foreign = describeForeign(column);
+    refEntity = describeRefEntity(column);
     javaGetter = "get" + capitalize(fieldName);
     javaSetter = "set" + capitalize(fieldName);
   }
 
-  private EntityDescriptor describeForeign(Field column) {
+  private EntityDescriptor describeRefEntity(Field column) {
     if (category == Category.MANY_TO_ONE) {
       Class<?> targetEntity = column.getDeclaredAnnotation(ManyToOne.class).targetEntity();
-      return new EntityDescriptor(targetEntity);
+      return new EntityDescriptor(targetEntity, this, isLazy);
     } else {
       return null;
     }
@@ -81,7 +81,7 @@ public class FieldDescriptor {
   private String describeColName(Field column) {
     switch (category) {
       case ID:
-        return "ID" ;
+        return "ID";
       case COLUMN:
         return column.getDeclaredAnnotation(Column.class).name();
     }
@@ -120,8 +120,8 @@ public class FieldDescriptor {
     return isLazy;
   }
 
-  public EntityDescriptor getRefEntity() {
-    return foreign;
+  public EntityDescriptor asDescribedEntity() {
+    return refEntity;
   }
 
   public String getFieldName() {

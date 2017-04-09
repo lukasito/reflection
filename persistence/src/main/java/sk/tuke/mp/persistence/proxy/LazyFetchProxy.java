@@ -1,5 +1,7 @@
 package sk.tuke.mp.persistence.proxy;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import sk.tuke.mp.persistence.utils.EntityDescriptor;
 
 import java.lang.reflect.Proxy;
@@ -7,18 +9,32 @@ import java.sql.Connection;
 
 public class LazyFetchProxy {
 
-  private final Connection connection;
+  private static final Logger log = LoggerFactory.getLogger(LazyFetchProxy.class);
 
-  public LazyFetchProxy(Connection connection) {
-    this.connection = connection;
+  public static Object create(
+    int enclosingEntityId, EntityDescriptor entityDescriptor, Connection connection
+  ) throws Exception {
+    Class<?> underlying = entityDescriptor.getUnderlying();
+    Class<?> firstInterface = findFirstInterface(underlying);
+    if (entityDescriptor.isLazy()) {
+      log.debug("Proxying entity {}", underlying);
+      return firstInterface.cast(
+        Proxy.newProxyInstance(underlying.getClassLoader(), new Class[]{firstInterface},
+          new LazyFetchInvocationHandler(enclosingEntityId, entityDescriptor, connection))
+      );
+    } else {
+      log.debug("Entity is not lazy, no proxy required...");
+    }
+    return firstInterface.cast(underlying.newInstance());
   }
 
-  public <T> T enhanceClassWithProxy(Class<T> klass) throws Exception {
-    EntityDescriptor entityDescriptor = new EntityDescriptor(klass);
-    if (entityDescriptor.containsLazy()) {
-      return klass.cast(Proxy.newProxyInstance(klass.getClassLoader(), new Class[]{klass},
-        new LazyFetchInvocationHandler(entityDescriptor, connection)));
+  private static Class<?> findFirstInterface(Class<?> klass) {
+    Class<?>[] interfaces = klass.getInterfaces();
+    if (interfaces == null || interfaces.length == 0) {
+      IllegalArgumentException iae = new IllegalArgumentException(String.format("Class <%s> has no interfaces", klass));
+      log.error("Exception while finding interfaces", iae);
+      throw iae;
     }
-    return klass.newInstance();
+    return interfaces[0];
   }
 }

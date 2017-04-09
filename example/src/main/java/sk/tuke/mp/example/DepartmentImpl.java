@@ -14,6 +14,9 @@ public class DepartmentImpl implements Department {
   @Column(name = "code")
   private String code;
 
+  public DepartmentImpl() {
+  }
+
   public DepartmentImpl(String name, String code) {
     this.name = name;
     this.code = code;

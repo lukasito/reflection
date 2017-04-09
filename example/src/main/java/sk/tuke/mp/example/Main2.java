@@ -1,21 +1,25 @@
 package sk.tuke.mp.example;
 
-import sk.tuke.mp.persistence.proxy.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import sk.tuke.mp.persistence.ReflectivePersistenceManager;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
 
 public class Main2 {
 
+  private static final Logger log = LoggerFactory.getLogger(Main2.class);
+
   public static void main(String[] args) throws Exception {
     Connection connection = DriverManager.getConnection("jdbc:mysql://localhost:3306/test", "root", "root");
-    LazyFetchProxy lazyFetchProxy = new LazyFetchProxy(connection);
+    ReflectivePersistenceManager persistenceManager = new ReflectivePersistenceManager(connection);
+//    persistenceManager.initializeDatabase();
 
-    Person enhancedPerson = lazyFetchProxy.enhanceClassWithProxy(Person.class);
-    enhancedPerson.setAge(1);
-    int age = enhancedPerson.getAge();
-    System.out.println(age);
+    Person person = persistenceManager.myGet(Person.class, 1);
+    Department department = person.getDepartment();
 
-    System.out.println(enhancedPerson.getDepartment().getCode());
+    log.info("person age: {}", person.getAge());
+    log.info("department code: {}", department.getCode());
   }
 }

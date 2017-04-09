@@ -1,6 +1,9 @@
 package sk.tuke.mp.persistence;
 
 import org.apache.commons.io.IOUtils;
+import sk.tuke.mp.persistence.proxy.LazyFetchProxy;
+import sk.tuke.mp.persistence.utils.EntityDescriptor;
+import sk.tuke.mp.persistence.utils.FieldDescriptor;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -18,6 +21,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * Created by Joja on 28.02.2017.
@@ -80,6 +84,32 @@ public class ReflectivePersistenceManager implements PersistenceManager {
       e.printStackTrace();
     }
     throw new PersistenceException("getAll Failed");
+  }
+
+  public <T> T myGet(Class<T> type, int id) throws PersistenceException {
+    try {
+      // TODO call standard get to initialize <type> fields
+      T instance = type.newInstance();
+      EntityDescriptor entityDescriptor = new EntityDescriptor(type);
+      entityDescriptor.setId(instance, id);
+      proxyLazyReference(type, id, instance, entityDescriptor);
+      return instance;
+    } catch (Exception e) {
+      throw new PersistenceException(e);
+    }
+  }
+
+  private <T> void proxyLazyReference(Class<T> type, int id, T instance, EntityDescriptor entityDescriptor) throws Exception {
+    if (entityDescriptor.containsLazy()) {
+      List<EntityDescriptor> lazies = entityDescriptor.getLazies().stream()
+        .map(FieldDescriptor::asDescribedEntity)
+        .collect(Collectors.toList());
+      for (EntityDescriptor lazyEntity : lazies) {
+        Object proxy = LazyFetchProxy.create(id, lazyEntity, conn);
+        Method method = type.getMethod(lazyEntity.asDescribedField().getJavaSetter(), lazyEntity.getFirstInterface());
+        method.invoke(instance, proxy); // void
+      }
+    }
   }
 
   @Override

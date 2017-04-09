@@ -15,9 +15,17 @@ public class EntityDescriptor {
   private final Class<?> underlying;
   private final String entityName;
   private final List<FieldDescriptor> columns;
+  private final boolean isLazy;
+  private final FieldDescriptor descriptor;
 
   public EntityDescriptor(Class<?> underlying) {
+    this(underlying, null, false);
+  }
+
+  public EntityDescriptor(Class<?> underlying, FieldDescriptor descriptor, boolean isLazy) {
     this.underlying = underlying;
+    this.isLazy = isLazy;
+    this.descriptor = descriptor;
     entityName = describeEntity(underlying);
     columns = describeEntityColumns(underlying);
   }
@@ -35,8 +43,34 @@ public class EntityDescriptor {
       .orElse(null);
   }
 
+  public void setId(Object instance, Object id) throws Exception {
+    FieldDescriptor idDescriptor = getId();
+    underlying.getMethod(idDescriptor.getJavaSetter(), int.class).invoke(instance, id);
+  }
+
+  public FieldDescriptor asDescribedField() {
+    return descriptor;
+  }
+
+  public Class<?> getFirstInterface() {
+    Class<?>[] interfaces = underlying.getInterfaces();
+    return interfaces == null || interfaces.length == 0
+      ? null
+      : interfaces[0];
+  }
+
+  public List<FieldDescriptor> getLazies() {
+    return columns.stream()
+      .filter(FieldDescriptor::isLazy)
+      .collect(Collectors.toList());
+  }
+
   public boolean containsLazy() {
     return columns.stream().anyMatch(FieldDescriptor::isLazy);
+  }
+
+  public boolean isLazy() {
+    return isLazy;
   }
 
   private List<FieldDescriptor> describeEntityColumns(Class<?> entity) {
